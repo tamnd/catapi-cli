@@ -13,13 +13,11 @@ import (
 
 // --- fixture JSON ---
 
-const fakeBreedsJSON = `[{"id":"abys","name":"Abyssinian","origin":"Egypt","temperament":"Active, Energetic, Independent","life_span":"14 - 15","description":"The Abyssinian is easy to care for."},{"id":"siam","name":"Siamese","origin":"Thailand","temperament":"Active, Agile, Clever","life_span":"15 - 20","description":"The Siamese is a very old breed."}]`
+const fakeBreedsJSON = `[{"id":"abys","name":"Abyssinian","origin":"Egypt","temperament":"Active, Energetic, Independent","life_span":"14 - 15","weight":{"imperial":"7 - 10","metric":"3 - 5"},"intelligence":5,"affection_level":5,"energy_level":4,"child_friendly":3,"wikipedia_url":"https://en.wikipedia.org/wiki/Abyssinian_cat"},{"id":"siam","name":"Siamese","origin":"Thailand","temperament":"Active, Agile, Clever","life_span":"15 - 20","weight":{"imperial":"8 - 15","metric":"4 - 7"},"intelligence":5,"affection_level":5,"energy_level":4,"child_friendly":4,"wikipedia_url":"https://en.wikipedia.org/wiki/Siamese_cat"}]`
 
-const fakeSiameseJSON = `[{"id":"siam","name":"Siamese","origin":"Thailand","temperament":"Active, Agile, Clever","life_span":"15 - 20","description":"The Siamese is a very old breed."}]`
+const fakeSiameseJSON = `[{"id":"siam","name":"Siamese","origin":"Thailand","temperament":"Active, Agile, Clever","life_span":"15 - 20","weight":{"imperial":"8 - 15","metric":"4 - 7"},"intelligence":5,"affection_level":5,"energy_level":4,"child_friendly":4,"wikipedia_url":"https://en.wikipedia.org/wiki/Siamese_cat"}]`
 
-const fakeImagesJSON = `[{"id":"3v7","url":"https://cdn2.thecatapi.com/images/3v7.gif","width":500,"height":375,"breeds":[]},{"id":"6ne","url":"https://cdn2.thecatapi.com/images/6ne.jpg","width":1200,"height":800,"breeds":[{"id":"beng","name":"Bengal","temperament":"Alert, Agile","origin":"United States","life_span":"12 - 16"}]}]`
-
-const fakeCategoriesJSON = `[{"id":1,"name":"hats"},{"id":2,"name":"space"},{"id":4,"name":"sunglasses"}]`
+const fakeImagesJSON = `[{"id":"3v7","url":"https://cdn2.thecatapi.com/images/3v7.gif","width":500,"height":375},{"id":"6ne","url":"https://cdn2.thecatapi.com/images/6ne.jpg","width":1200,"height":800}]`
 
 // --- helpers ---
 
@@ -30,9 +28,9 @@ func newTestClient(ts *httptest.Server) *catapi.Client {
 	return catapi.NewClient(cfg)
 }
 
-// --- Search tests ---
+// --- Images tests ---
 
-func TestSearchSendsUserAgent(t *testing.T) {
+func TestImagesSendsUserAgent(t *testing.T) {
 	var gotUA string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotUA = r.Header.Get("User-Agent")
@@ -41,7 +39,7 @@ func TestSearchSendsUserAgent(t *testing.T) {
 	defer ts.Close()
 
 	c := newTestClient(ts)
-	_, err := c.Search(context.Background(), 2, "", false)
+	_, err := c.Images(context.Background(), 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,14 +48,14 @@ func TestSearchSendsUserAgent(t *testing.T) {
 	}
 }
 
-func TestSearchParsesImages(t *testing.T) {
+func TestImagesParsesItems(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = fmt.Fprint(w, fakeImagesJSON)
 	}))
 	defer ts.Close()
 
 	c := newTestClient(ts)
-	items, err := c.Search(context.Background(), 2, "", false)
+	items, err := c.Images(context.Background(), 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,27 +68,25 @@ func TestSearchParsesImages(t *testing.T) {
 		t.Errorf("items[0].ID = %q, want 3v7", first.ID)
 	}
 	if !strings.Contains(first.URL, "cdn2.thecatapi.com") {
-		t.Errorf("items[0].URL = %q, want cdn2.thecatapi.com", first.URL)
+		t.Errorf("items[0].URL = %q, want cdn2.thecatapi.com URL", first.URL)
 	}
 	if first.Width != 500 {
 		t.Errorf("items[0].Width = %d, want 500", first.Width)
 	}
-	// first image has no breeds
-	if first.Breed != "" {
-		t.Errorf("items[0].Breed = %q, want empty", first.Breed)
+	if first.Height != 375 {
+		t.Errorf("items[0].Height = %d, want 375", first.Height)
 	}
 
-	// second image has Bengal breed info
 	second := items[1]
-	if second.Breed != "Bengal" {
-		t.Errorf("items[1].Breed = %q, want Bengal", second.Breed)
+	if second.ID != "6ne" {
+		t.Errorf("items[1].ID = %q, want 6ne", second.ID)
 	}
-	if second.Origin != "United States" {
-		t.Errorf("items[1].Origin = %q, want United States", second.Origin)
+	if second.Width != 1200 {
+		t.Errorf("items[1].Width = %d, want 1200", second.Width)
 	}
 }
 
-func TestSearchPassesBreedParam(t *testing.T) {
+func TestImagesLimitParam(t *testing.T) {
 	var gotQuery string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotQuery = r.URL.RawQuery
@@ -99,16 +95,16 @@ func TestSearchPassesBreedParam(t *testing.T) {
 	defer ts.Close()
 
 	c := newTestClient(ts)
-	_, err := c.Search(context.Background(), 3, "beng", false)
+	_, err := c.Images(context.Background(), 3)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(gotQuery, "breed_ids=beng") {
-		t.Errorf("query = %q, want contains breed_ids=beng", gotQuery)
+	if !strings.Contains(gotQuery, "limit=3") {
+		t.Errorf("query = %q, want contains limit=3", gotQuery)
 	}
 }
 
-func TestSearchHasBreedsParam(t *testing.T) {
+func TestImagesDefaultLimit(t *testing.T) {
 	var gotQuery string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotQuery = r.URL.RawQuery
@@ -117,12 +113,12 @@ func TestSearchHasBreedsParam(t *testing.T) {
 	defer ts.Close()
 
 	c := newTestClient(ts)
-	_, err := c.Search(context.Background(), 5, "", true)
+	_, err := c.Images(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(gotQuery, "has_breeds=1") {
-		t.Errorf("query = %q, want contains has_breeds=1", gotQuery)
+	if !strings.Contains(gotQuery, "limit=5") {
+		t.Errorf("query = %q, want contains limit=5 (default)", gotQuery)
 	}
 }
 
@@ -155,6 +151,24 @@ func TestBreedsParsesItems(t *testing.T) {
 	if !strings.Contains(got.Temperament, "Active") {
 		t.Errorf("items[0].Temperament = %q, want contains Active", got.Temperament)
 	}
+	if got.WeightMetric != "3 - 5" {
+		t.Errorf("items[0].WeightMetric = %q, want 3 - 5", got.WeightMetric)
+	}
+	if got.Intelligence != 5 {
+		t.Errorf("items[0].Intelligence = %d, want 5", got.Intelligence)
+	}
+	if got.AffectionLevel != 5 {
+		t.Errorf("items[0].AffectionLevel = %d, want 5", got.AffectionLevel)
+	}
+	if got.EnergyLevel != 4 {
+		t.Errorf("items[0].EnergyLevel = %d, want 4", got.EnergyLevel)
+	}
+	if got.ChildFriendly != 3 {
+		t.Errorf("items[0].ChildFriendly = %d, want 3", got.ChildFriendly)
+	}
+	if !strings.Contains(got.WikipediaURL, "wikipedia.org") {
+		t.Errorf("items[0].WikipediaURL = %q, want contains wikipedia.org", got.WikipediaURL)
+	}
 	if items[1].Name != "Siamese" {
 		t.Errorf("items[1].Name = %q, want Siamese", items[1].Name)
 	}
@@ -182,29 +196,8 @@ func TestSearchBreedsQuery(t *testing.T) {
 	if len(items) != 1 || items[0].Name != "Siamese" {
 		t.Errorf("items = %v, want one Siamese", items)
 	}
-}
-
-// --- Categories tests ---
-
-func TestCategoriesParsesItems(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprint(w, fakeCategoriesJSON)
-	}))
-	defer ts.Close()
-
-	c := newTestClient(ts)
-	items, err := c.Categories(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(items) != 3 {
-		t.Fatalf("len(items) = %d, want 3", len(items))
-	}
-	if items[0].ID != 1 || items[0].Name != "hats" {
-		t.Errorf("items[0] = %+v, want {ID:1 Name:hats}", items[0])
-	}
-	if items[2].Name != "sunglasses" {
-		t.Errorf("items[2].Name = %q, want sunglasses", items[2].Name)
+	if items[0].WeightMetric != "4 - 7" {
+		t.Errorf("items[0].WeightMetric = %q, want 4 - 7", items[0].WeightMetric)
 	}
 }
 

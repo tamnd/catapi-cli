@@ -31,7 +31,7 @@ func (Domain) Info() kit.DomainInfo {
 			Short:  "Cat breed info and random images from TheCatAPI",
 			Long: `catapi fetches cat breed information and random cat images from
 TheCatAPI (api.thecatapi.com). No API key required for public endpoints.
-Supports breed listing, name search, image search, and category listing.`,
+Supports breed listing, name search, and image retrieval.`,
 			Site: Host,
 			Repo: "https://github.com/tamnd/catapi-cli",
 		},
@@ -42,29 +42,29 @@ Supports breed listing, name search, image search, and category listing.`,
 func (Domain) Register(app *kit.App) {
 	app.SetClient(newClient)
 
-	// search: find cat images, optionally filtered by breed
-	kit.Handle(app, kit.OpMeta{
-		Name:    "search",
-		Group:   "read",
-		List:    true,
-		Summary: "Search for cat images",
-	}, searchOp)
-
-	// breeds: list all cat breeds or search by name
+	// breeds: list all cat breeds (paginated)
 	kit.Handle(app, kit.OpMeta{
 		Name:    "breeds",
 		Group:   "read",
 		List:    true,
-		Summary: "List or search cat breeds",
+		Summary: "List all cat breeds",
 	}, breedsOp)
 
-	// categories: list image categories
+	// search: search breeds by name
 	kit.Handle(app, kit.OpMeta{
-		Name:    "categories",
+		Name:    "search",
 		Group:   "read",
 		List:    true,
-		Summary: "List image categories",
-	}, categoriesOp)
+		Summary: "Search cat breeds by name",
+	}, searchOp)
+
+	// images: get random cat images
+	kit.Handle(app, kit.OpMeta{
+		Name:    "images",
+		Group:   "read",
+		List:    true,
+		Summary: "Get random cat images",
+	}, imagesOp)
 }
 
 // newClient builds the client from host-resolved config.
@@ -87,52 +87,33 @@ func newClient(_ context.Context, cfg kit.Config) (any, error) {
 
 // --- inputs ---
 
-type searchInput struct {
-	Limit     int           `kit:"flag,inherit" help:"max images to return"`
-	Breed     string        `kit:"flag"         help:"filter by breed ID (e.g. beng)"`
-	HasBreeds bool          `kit:"flag"         help:"only return images with breed info"`
-	Delay     time.Duration `kit:"flag,inherit" help:"minimum spacing between requests"`
-	Client    *Client       `kit:"inject"`
-}
-
 type breedsInput struct {
-	Query  string        `kit:"flag"         help:"search term; if empty, list all breeds"`
-	Limit  int           `kit:"flag,inherit" help:"max results"`
+	Limit  int           `kit:"flag,inherit" help:"max breeds to return (default 25)"`
 	Page   int           `kit:"flag"         help:"page number for breed listing (default 0)"`
 	Delay  time.Duration `kit:"flag,inherit" help:"minimum spacing between requests"`
 	Client *Client       `kit:"inject"`
 }
 
-type categoriesInput struct {
+type searchInput struct {
+	Query  string        `kit:"arg"          help:"breed name to search for"`
+	Delay  time.Duration `kit:"flag,inherit" help:"minimum spacing between requests"`
+	Client *Client       `kit:"inject"`
+}
+
+type imagesInput struct {
+	Limit  int           `kit:"flag,inherit" help:"max images to return (default 5)"`
 	Delay  time.Duration `kit:"flag,inherit" help:"minimum spacing between requests"`
 	Client *Client       `kit:"inject"`
 }
 
 // --- handlers ---
 
-func searchOp(ctx context.Context, in searchInput, emit func(Image) error) error {
-	items, err := in.Client.Search(ctx, in.Limit, in.Breed, in.HasBreeds)
-	if err != nil {
-		return mapErr(err)
-	}
-	for _, item := range items {
-		if err := emit(item); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func breedsOp(ctx context.Context, in breedsInput, emit func(Breed) error) error {
-	var (
-		items []Breed
-		err   error
-	)
-	if in.Query != "" {
-		items, err = in.Client.SearchBreeds(ctx, in.Query)
-	} else {
-		items, err = in.Client.Breeds(ctx, in.Limit, in.Page)
+	limit := in.Limit
+	if limit <= 0 {
+		limit = 25
 	}
+	items, err := in.Client.Breeds(ctx, limit, in.Page)
 	if err != nil {
 		return mapErr(err)
 	}
@@ -144,8 +125,25 @@ func breedsOp(ctx context.Context, in breedsInput, emit func(Breed) error) error
 	return nil
 }
 
-func categoriesOp(ctx context.Context, in categoriesInput, emit func(Category) error) error {
-	items, err := in.Client.Categories(ctx)
+func searchOp(ctx context.Context, in searchInput, emit func(Breed) error) error {
+	items, err := in.Client.SearchBreeds(ctx, in.Query)
+	if err != nil {
+		return mapErr(err)
+	}
+	for _, item := range items {
+		if err := emit(item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func imagesOp(ctx context.Context, in imagesInput, emit func(CatImage) error) error {
+	limit := in.Limit
+	if limit <= 0 {
+		limit = 5
+	}
+	items, err := in.Client.Images(ctx, limit)
 	if err != nil {
 		return mapErr(err)
 	}
