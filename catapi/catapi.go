@@ -34,8 +34,8 @@ func DefaultConfig() Config {
 	return Config{
 		BaseURL:   "https://api.thecatapi.com",
 		UserAgent: "catapi-cli/0.1 (tamnd87@gmail.com)",
-		Rate:      300 * time.Millisecond,
-		Timeout:   10 * time.Second,
+		Rate:      500 * time.Millisecond,
+		Timeout:   15 * time.Second,
 		Retries:   3,
 	}
 }
@@ -56,22 +56,14 @@ func NewClient(cfg Config) *Client {
 	}
 }
 
-// Search returns cat images. Use breed to filter by breed ID (e.g. "beng").
-// Set hasBreeds to true to only return images that have breed info attached.
-// limit controls the maximum number of results (default 5 if <= 0).
-// Calls GET /v1/images/search.
-func (c *Client) Search(ctx context.Context, limit int, breed string, hasBreeds bool) ([]Image, error) {
+// Images returns random cat images. limit controls the maximum number of
+// results (default 5 if <= 0). Calls GET /v1/images/search.
+func (c *Client) Images(ctx context.Context, limit int) ([]CatImage, error) {
 	if limit <= 0 {
 		limit = 5
 	}
 	params := neturl.Values{}
 	params.Set("limit", fmt.Sprintf("%d", limit))
-	if breed != "" {
-		params.Set("breed_ids", breed)
-	}
-	if hasBreeds {
-		params.Set("has_breeds", "1")
-	}
 	u := fmt.Sprintf("%s/v1/images/search?%s", c.cfg.BaseURL, params.Encode())
 	body, err := c.get(ctx, u)
 	if err != nil {
@@ -81,19 +73,14 @@ func (c *Client) Search(ctx context.Context, limit int, breed string, hasBreeds 
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("decode images: %w", err)
 	}
-	out := make([]Image, 0, len(raw))
+	out := make([]CatImage, 0, len(raw))
 	for _, r := range raw {
-		img := Image{
+		out = append(out, CatImage{
 			ID:     r.ID,
 			URL:    r.URL,
 			Width:  r.Width,
 			Height: r.Height,
-		}
-		if len(r.Breeds) > 0 {
-			img.Breed = r.Breeds[0].Name
-			img.Origin = r.Breeds[0].Origin
-		}
-		out = append(out, img)
+		})
 	}
 	return out, nil
 }
@@ -140,32 +127,19 @@ func (c *Client) SearchBreeds(ctx context.Context, query string) ([]Breed, error
 	return out, nil
 }
 
-// Categories returns all image categories. Calls GET /v1/categories.
-func (c *Client) Categories(ctx context.Context) ([]Category, error) {
-	u := fmt.Sprintf("%s/v1/categories", c.cfg.BaseURL)
-	body, err := c.get(ctx, u)
-	if err != nil {
-		return nil, err
-	}
-	var raw []wireCategory
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("decode categories: %w", err)
-	}
-	out := make([]Category, 0, len(raw))
-	for _, r := range raw {
-		out = append(out, Category{ID: r.ID, Name: r.Name})
-	}
-	return out, nil
-}
-
 func breedFromWire(r wireBreed) Breed {
 	return Breed{
-		ID:          r.ID,
-		Name:        r.Name,
-		Origin:      r.Origin,
-		Temperament: r.Temperament,
-		LifeSpan:    r.LifeSpan,
-		Description: r.Description,
+		ID:             r.ID,
+		Name:           r.Name,
+		Origin:         r.Origin,
+		Temperament:    r.Temperament,
+		LifeSpan:       r.LifeSpan,
+		WeightMetric:   r.Weight.Metric,
+		Intelligence:   r.Intelligence,
+		AffectionLevel: r.AffectionLevel,
+		EnergyLevel:    r.EnergyLevel,
+		ChildFriendly:  r.ChildFriendly,
+		WikipediaURL:   r.WikipediaURL,
 	}
 }
 

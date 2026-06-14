@@ -2,30 +2,27 @@ package catapi
 
 // --- output types (emitted to the user) ---
 
-// Image is one cat image result from TheCatAPI.
-type Image struct {
+// CatImage is one cat image result from TheCatAPI.
+type CatImage struct {
 	ID     string `kit:"id" json:"id"`
 	URL    string `json:"url"`
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
-	Breed  string `json:"breed"`  // first breed name, or ""
-	Origin string `json:"origin"` // first breed origin, or ""
 }
 
 // Breed is one cat breed from TheCatAPI.
 type Breed struct {
-	ID          string `kit:"id" json:"id"`
-	Name        string `json:"name"`
-	Origin      string `json:"origin"`
-	Temperament string `json:"temperament"`
-	LifeSpan    string `json:"life_span"`
-	Description string `json:"description"`
-}
-
-// Category is one image category from TheCatAPI.
-type Category struct {
-	ID   int    `kit:"id" json:"id"`
-	Name string `json:"name"`
+	ID             string `kit:"id"             json:"id"`
+	Name           string `json:"name"`
+	Origin         string `json:"origin"`
+	Temperament    string `json:"temperament"`
+	LifeSpan       string `json:"life_span"`
+	WeightMetric   string `json:"weight_metric"`
+	Intelligence   int    `json:"intelligence"`
+	AffectionLevel int    `json:"affection_level"`
+	EnergyLevel    int    `json:"energy_level"`
+	ChildFriendly  int    `json:"child_friendly"`
+	WikipediaURL   string `json:"wikipedia_url"`
 }
 
 // --- wire types (unexported, only used for JSON decoding) ---
@@ -35,25 +32,23 @@ type wireImage struct {
 	URL    string `json:"url"`
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
-	Breeds []struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
-		Temperament string `json:"temperament"`
-		Origin      string `json:"origin"`
-		LifeSpan    string `json:"life_span"`
-	} `json:"breeds"`
+}
+
+type wireWeight struct {
+	Imperial string `json:"imperial"`
+	Metric   string `json:"metric"`
 }
 
 type wireBreed struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Origin      string `json:"origin"`
-	Temperament string `json:"temperament"`
-	LifeSpan    string `json:"life_span"`
-	Description string `json:"description"`
-}
-
-type wireCategory struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	Origin         string     `json:"origin"`
+	Temperament    string     `json:"temperament"`
+	LifeSpan       string     `json:"life_span"`
+	Weight         wireWeight `json:"weight"`
+	Intelligence   int        `json:"intelligence"`
+	AffectionLevel int        `json:"affection_level"`
+	EnergyLevel    int        `json:"energy_level"`
+	ChildFriendly  int        `json:"child_friendly"`
+	WikipediaURL   string     `json:"wikipedia_url"`
 }
